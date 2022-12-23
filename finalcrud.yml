@@ -1,0 +1,342 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Python_Rest_API
+
+Parameters:
+ LambdaFuncPost:
+   Type: String
+   Default: Python_POST_Rest_API
+ LambdaFuncGet:
+   Type: String
+   Default: Python_GET_Rest_API
+ LambdaFuncUpdate:
+   Type: String
+   Default: Python_UPDATE_Rest_API
+ LambdaFuncDelete:
+   Type: String
+   Default: Python_DELETE_Rest_API
+ APIName:
+   Type: String
+   Default: Rest_API_Python
+ EnvironmentName:
+   Type: String
+   Default: test
+ 
+
+Resources:
+  LambdaFuncNamePOST:
+    Type: AWS::Lambda::Function
+    Properties: 
+      FunctionName:
+        Ref: LambdaFuncPost 
+      Handler: index.saveData
+      Runtime: python3.8
+      Timeout: 300
+      Role: !GetAtt IAMRole.Arn
+    DependsOn:
+    - DynamoDBTable
+  LambdaFuncNameGET:
+    Type: AWS::Lambda::Function
+    Properties: 
+      FunctionName:
+        Ref:  LambdaFuncGet
+      Handler: index.getData
+      Runtime: python3.8
+      Timeout: 300
+      Role: !GetAtt IAMRole.Arn
+    DependsOn:
+    - DynamoDBTable
+  LambdaFuncNameUPDATE:
+    Type: AWS::Lambda::Function
+    Properties: 
+      FunctionName:
+        Ref: LambdaFuncUpdate
+      Handler: index.updateData
+      Runtime: python3.8
+      Timeout: 300
+      Role: !GetAtt IAMRole.Arn
+    DependsOn:
+    - DynamoDBTable
+  LambdaFuncNameDELETE:
+    Type: AWS::Lambda::Function
+    Properties: 
+      FunctionName:
+        Ref: LambdaFuncDelete 
+      Handler: index.deleteData
+      Runtime: python3.8
+      Timeout: 300
+      Role: !GetAtt IAMRole.Arn
+    DependsOn:
+    - DynamoDBTable
+ 
+ 
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: weather
+      AttributeDefinitions:
+      - AttributeName: city
+        AttributeType: S
+      
+      KeySchema:
+      - AttributeName: city
+        KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+    DependsOn:
+    - IAMRole
+  APIGatewayRestAPI:
+   Type: 'AWS::ApiGateway::RestApi'
+   Description: Python_Rest_API_Gateway
+   Properties:
+     Name:
+       Ref: APIName
+  APIGatewayResourcePost:
+   Type: 'AWS::ApiGateway::Resource'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ParentId: !GetAtt
+       - APIGatewayRestAPI
+       - RootResourceId
+     PathPart: PostData
+   DependsOn:
+     - APIGatewayRestAPI
+  APIGatewayResourceGet:
+   Type: 'AWS::ApiGateway::Resource'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ParentId: !GetAtt
+       - APIGatewayRestAPI
+       - RootResourceId
+     PathPart: GetData
+   DependsOn:
+     - APIGatewayRestAPI
+  APIGatewayResourceUpdate:
+   Type: 'AWS::ApiGateway::Resource'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ParentId: !GetAtt
+       - APIGatewayRestAPI
+       - RootResourceId
+     PathPart: UpdateData
+   DependsOn:
+     - APIGatewayRestAPI
+  APIGatewayResourceDelete:
+   Type: 'AWS::ApiGateway::Resource'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ParentId: !GetAtt
+       - APIGatewayRestAPI
+       - RootResourceId
+     PathPart: DeleteData
+   DependsOn:
+     - APIGatewayRestAPI
+  
+  APIGatewayMethodPost:
+   Type: 'AWS::ApiGateway::Method'
+   Description: Post_DynamoDB_Method
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ResourceId: !Ref APIGatewayResourcePost
+     HttpMethod: POST
+     AuthorizationType: NONE
+     MethodResponses:
+       - StatusCode: 200
+     Integration:
+       Type: AWS_PROXY
+       IntegrationResponses:
+         - StatusCode: 200
+           
+       IntegrationHttpMethod: POST
+      
+       Uri: !Sub 
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFuncNamePOST.Arn
+   DependsOn:
+     - APIGatewayResourcePost
+  APIGatewayMethodGet:
+   Type: 'AWS::ApiGateway::Method'
+   Description: Get_DynamoDB_Method
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ResourceId: !Ref APIGatewayResourceGet
+     HttpMethod: GET
+     AuthorizationType: NONE
+     MethodResponses:
+       - StatusCode: 200
+     Integration:
+       Type: AWS_PROXY
+       IntegrationResponses:
+         - StatusCode: 200
+           
+       IntegrationHttpMethod: POST
+      
+       Uri: !Sub 
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFuncNameGET.Arn
+
+   DependsOn:
+     - APIGatewayResourceGet
+  APIGatewayMethodUpdate:
+   Type: 'AWS::ApiGateway::Method'
+   Description: Update_DynamoDB_Method
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ResourceId: !Ref APIGatewayResourceUpdate
+     HttpMethod: PATCH
+     AuthorizationType: NONE
+     MethodResponses:
+       - StatusCode: 200
+     Integration:
+       Type: AWS_PROXY
+       IntegrationResponses:
+         - StatusCode: 200
+           
+       IntegrationHttpMethod: POST
+      
+       Uri: !Sub 
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFuncNameUPDATE.Arn
+
+
+   DependsOn:
+     -  APIGatewayResourceUpdate
+  APIGatewayMethodDelete:
+
+   Type: 'AWS::ApiGateway::Method'
+   Description: Delete_DynamoDB_Method
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     ResourceId: !Ref APIGatewayResourceDelete
+     HttpMethod: DELETE
+     AuthorizationType: NONE
+     MethodResponses:
+       - StatusCode: 200
+     Integration:
+       Type: AWS_PROXY
+       IntegrationResponses:
+         - StatusCode: 200
+           
+       IntegrationHttpMethod: POST
+      
+       Uri: !Sub 
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFuncNameDELETE.Arn
+
+   DependsOn:
+     - APIGatewayResourceDelete
+  
+  APIGatewayDeploymentPost:
+   Type: 'AWS::ApiGateway::Deployment'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     StageName:
+       Ref: EnvironmentName
+   DependsOn:
+     - APIGatewayMethodPost
+  APIGatewayDeploymentGet:
+   Type: 'AWS::ApiGateway::Deployment'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     StageName:
+       Ref: EnvironmentName
+   DependsOn:
+     - APIGatewayMethodGet
+  APIGatewayDeploymentUpdate:
+   Type: 'AWS::ApiGateway::Deployment'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     StageName:
+       Ref: EnvironmentName
+   DependsOn:
+     - APIGatewayMethodUpdate
+  APIGatewayDeploymentDelete:
+   Type: 'AWS::ApiGateway::Deployment'
+   Properties:
+     RestApiId: !Ref APIGatewayRestAPI
+     StageName:
+       Ref: EnvironmentName
+   DependsOn:
+     - APIGatewayMethodDelete
+ 
+  APIGatewayPermissionPost:
+   Type: 'AWS::Lambda::Permission'
+   Properties:
+     Action: 'lambda:InvokeFunction'
+     FunctionName: !GetAtt LambdaFuncNamePOST.Arn
+     Principal: apigateway.amazonaws.com
+   DependsOn:
+     - APIGatewayDeploymentPost
+  APIGatewayPermissionGet:
+   Type: 'AWS::Lambda::Permission'
+   Properties:
+     Action: 'lambda:InvokeFunction'
+     FunctionName: !GetAtt LambdaFuncNameGET.Arn
+     Principal: apigateway.amazonaws.com
+   DependsOn:
+     - APIGatewayDeploymentGet
+ 
+  APIGatewayPermissionUpdate:
+   Type: 'AWS::Lambda::Permission'
+   Properties:
+     Action: 'lambda:InvokeFunction'
+     FunctionName: !GetAtt LambdaFuncNameUPDATE.Arn
+     Principal: apigateway.amazonaws.com
+   DependsOn:
+     - APIGatewayDeploymentUpdate
+  APIGatewayPermissionDelete:
+   Type: 'AWS::Lambda::Permission'
+   Properties:
+     Action: 'lambda:InvokeFunction'
+     FunctionName: !GetAtt LambdaFuncNameDELETE.Arn
+     Principal: apigateway.amazonaws.com
+   DependsOn:
+     - APIGatewayDeploymentDelete
+  
+
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: Policy_api-lambda-db
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:BatchGetItem
+            - dynamodb:BatchWriteItem
+            - dynamodb:TagResource
+            - dynamodb:UntagResource
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            - dynamodb:GetItem
+            - dynamodb:Scan
+            - dynamodb:Query
+            - dynamodb:UpdateItem
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogStream
+            - logs:CreateLogGroup
+            - logs:PutLogEvents
+            Resource: '*'
+          - Effect: Allow
+            Action:
+             - s3:*
+             - s3-object-lambda:*
+            Resource: '*'
+
+Outputs:
+ InvokeURL:
+   Value: !Sub https://${APIGatewayRestAPI}.execute-api.${AWS::Region}.amazonaws.com/${EnvironmentName}
